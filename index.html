@@ -1,30 +1,62 @@
 <!doctype html>
 <html lang="en">
-
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Spiral Visualizer</title>
+<style>
+html,body{margin:0;height:100%;background:#07080a;overflow:hidden;font-family:ui-monospace,Menlo,Consolas,monospace;color:#f3e6cf}
+canvas{display:block;touch-action:none}
+#ui{position:fixed;left:16px;top:16px;z-index:10;width:300px;background:rgba(14,15,18,.74);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,235,204,.14);border-radius:14px;padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;user-select:none;-webkit-user-select:none;box-sizing:border-box}
+#ui .t{background:rgba(255,235,204,.06);border:1px solid rgba(255,235,204,.1);border-radius:9px;padding:8px 4px;text-align:center;font-size:11px;cursor:pointer;letter-spacing:.04em}
+#ui .t:hover{background:rgba(255,235,204,.14)}
+#ui .s2{grid-column:span 2}
+#ui .hot{background:rgba(255,200,120,.22);border-color:rgba(255,200,120,.35)}
+#ui .rec{background:rgba(255,80,80,.35)}
+#grab{grid-column:span 4;height:10px;cursor:move;display:flex;justify-content:center;align-items:center;touch-action:none}
+#grab:before{content:'';width:42px;height:4px;border-radius:2px;background:rgba(255,235,204,.3)}
+#time{font-size:12px;text-align:center;grid-column:span 4}
+#scrub{grid-column:span 4;width:100%;accent-color:#ffd9a0;margin:2px 0}
+#txt{grid-column:span 4;background:rgba(0,0,0,.3);border:1px solid rgba(255,235,204,.15);border-radius:8px;color:#f3e6cf;padding:7px;font:12px ui-monospace,Menlo,monospace;text-transform:uppercase;box-sizing:border-box;width:100%;letter-spacing:.12em}
+.sw{display:flex;gap:6px;grid-column:span 4}
+.sw input{flex:1;height:26px;border:1px solid rgba(255,235,204,.15);border-radius:7px;background:none;padding:0;cursor:pointer}
+#status{grid-column:span 4;font-size:11px;opacity:.78;text-align:center;min-height:14px}
+#dbg{position:fixed;right:12px;bottom:12px;z-index:11;font:11px/1.45 ui-monospace,Menlo,monospace;color:#b9f5b9;background:rgba(0,0,0,.62);padding:7px 9px;border-radius:8px;max-width:46vw;white-space:normal;pointer-events:none}
+#hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;font-size:13px;letter-spacing:.06em;opacity:.7;pointer-events:none;max-width:80vw;line-height:1.6}
+@media (max-width:600px){#ui{width:calc(100vw - 24px);left:12px;top:12px}#dbg{max-width:80vw}}
+</style>
+</head>
 <body>
-
-  
-  
-  Play
-  −10s
-  Stop
-  +10s
-  Close up
+<div id="ui">
+  <div id="grab"></div>
+  <label class="t s2" id="bUp">Upload MP3<input type="file" id="file" accept="audio/*" hidden></label>
+  <div class="t s2 hot" id="bPlay">Play</div>
+  <div class="t" id="bBack">−10s</div>
+  <div class="t" id="bStop">Stop</div>
+  <div class="t" id="bFwd">+10s</div>
+  <div class="t" id="bView">Close up</div>
   <input type="range" id="scrub" min="0" max="1000" value="0">
-  0:00 / 0:00
+  <div id="time">0:00 / 0:00</div>
   <input type="text" id="txt" maxlength="16" spellcheck="false" placeholder="YOUR TEXT">
-  
-  Record
-  Copy link
-  Diagnostics
-  Reset view
-  Upload a track to map it
+  <div class="sw"><input type="color" id="c1" title="Inner colour"><input type="color" id="c2" title="Middle colour"><input type="color" id="c3" title="Outer colour"></div>
+  <div class="t s2" id="bRec">Record</div>
+  <div class="t s2" id="bLink">Copy link</div>
+  <div class="t s2" id="bDiag">Diagnostics</div>
+  <div class="t s2" id="bReset">Reset view</div>
+  <div id="status">Upload a track to map it</div>
+</div>
+<div id="dbg">starting…</div>
+<div id="hint">Upload a track.<br>The whole song is mapped first and sits there dim.<br>As it plays, the beam lights up everything it passes.</div>
 
-starting…
-Upload a track. The whole song is mapped first and sits there dim. As it plays, the beam lights up everything it passes — and it stays lit.
-
-
-
+<script>
+window.__errs=[];
+addEventListener('error',function(e){__errs.push((e.message||'Error')+(e.lineno?' (line '+e.lineno+')':''))});
+addEventListener('unhandledrejection',function(e){__errs.push('Promise: '+((e.reason&&e.reason.message)||e.reason))});
+setTimeout(function(){if(!window.__v8ok){var d=document.getElementById('dbg');d.style.display='block';d.innerHTML='<span style="color:#ff7a7a">Engine did not start. '+(__errs.join('<br>')||'Check the internet connection — Three.js loads from unpkg.com.')+'</span>'}},7000);
+</script>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
 <script type="module">
 import * as THREE from 'three';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
@@ -36,12 +68,12 @@ const $=id=>document.getElementById(id);
 const PI=Math.PI,TAU=PI*2;
 const fmt=t=>{t=Math.max(0,t||0);return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
 
-/* ===== device budget ===== */
+/* ================= device budget (one app, two budgets) ================= */
 const MOBILE=matchMedia('(pointer:coarse)').matches||Math.min(innerWidth,innerHeight)<700;
 const Q=MOBILE?{dpr:Math.min(devicePixelRatio,1.5),strands:1,dotStep:2.4,bloomRes:.5,ember:.35,aa:false}
               :{dpr:Math.min(devicePixelRatio,2),strands:3,dotStep:1.4,bloomRes:1,ember:1,aa:true};
 
-/* ===== shareable state ===== */
+/* ================= shareable state ================= */
 const qs=new URLSearchParams(location.search);
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
@@ -51,11 +83,11 @@ const parsePal=s=>{const p=(s||'').split('-').map(h=>h.trim().replace('#',''));r
 let PAL=parsePal(qs.get('c'))||parsePal(lsGet('v8pal',''))||['#ffebcc','#ffebcc','#ffebcc'];
 function syncShare(){
   const c=PAL.map(x=>x.slice(1)).join('-');lsSet('v8txt',TXT);lsSet('v8pal',c);
-  try{const u=new URL(location.href);u.searchParams.set('t',TXT);u.searchParams.set('c',c);history.replaceState(null,'',u)}catch(e){}
+  try{const u=new URL(location.href);u.searchParams.set('t',TXT);u.searchParams.set('c',c);u.searchParams.delete('l');history.replaceState(null,'',u)}catch(e){}
 }
 
-/* ===== renderer ===== */
-const renderer=new THREE.WebGLRenderer({antialias:Q.aa,powerPreference:'high-performance',preserveDrawingBuffer:false});
+/* ================= renderer ================= */
+const renderer=new THREE.WebGLRenderer({antialias:Q.aa,powerPreference:'high-performance'});
 renderer.setPixelRatio(Q.dpr);renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x07080a);
@@ -63,17 +95,15 @@ const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,9000);
 camera.position.set(0,0,300);
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth*Q.bloomRes,innerHeight*Q.bloomRes),.6,.5,.1);
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth*Q.bloomRes,innerHeight*Q.bloomRes),.9,.5,.1);
 composer.addPass(bloom);composer.addPass(new OutputPass());
 
-/* ===== uniforms + materials =====
-   STAY-LIT RULE: once the playhead passes an element (uT >= tv) it holds at uLit permanently.
-   The flash on top is gentle and settles into that steady glow. */
-const U={uT:{value:-10},uS:{value:-1e5},uDim:{value:.085},uLit:{value:.85},uGain:{value:1},uZoom:{value:1},uPx:{value:1},
+/* ================= shared uniforms + materials ================= */
+const U={uT:{value:-10},uS:{value:-1e5},uDim:{value:.03},uLit:{value:.85},uGain:{value:1},uZoom:{value:1},uPx:{value:1},
   uC1:{value:new THREE.Color(PAL[0])},uC2:{value:new THREE.Color(PAL[1])},uC3:{value:new THREE.Color(PAL[2])},uR0:{value:20},uR1:{value:200}};
 const COMMON=`uniform vec3 uC1;uniform vec3 uC2;uniform vec3 uC3;uniform float uR0;uniform float uR1;uniform float uZoom;uniform float uGain;
 vec3 ombre(vec3 p){float f=clamp((length(p.xy)-uR0)/max(uR1-uR0,1.),0.,1.);return f<.5?mix(uC1,uC2,f*2.):mix(uC2,uC3,f*2.-1.);}
-float fadeD(float d){return mix(clamp(1.4-d/400.,.4,1.),1.,uZoom);}`;
+float fadeD(float d){return mix(clamp(1.4-d/260.,.06,1.),1.,uZoom);}`;
 const addMat=o=>new THREE.ShaderMaterial(Object.assign({uniforms:U,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending},o));
 const lineMat=addMat({
 vertexShader:`${COMMON}
@@ -81,9 +111,8 @@ uniform float uT;uniform float uDim;uniform float uLit;
 attribute float tv;attribute float br;varying vec3 vC;varying float vA;
 void main(){vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;
 float dt=uT-tv;float lit=step(0.,dt);float fl=lit*exp(-max(dt,0.)*3.2);
-float held=uLit*(1.-.3*uZoom);
-vA=(mix(uDim*(1.+uZoom*2.),held,lit)+fl*.6*uGain)*br*fadeD(-mv.z);
-vC=mix(ombre(position),vec3(1.,.97,.9),clamp(fl,0.,1.)*.7);}`,
+vA=(mix(uDim*(1.+uZoom*2.),uLit*(1.-.3*uZoom),lit)+fl*.6*uGain)*br*fadeD(-mv.z);
+vC=mix(ombre(position),vec3(1.,.97,.9),clamp(fl,0.,1.)*.85);}`,
 fragmentShader:`varying vec3 vC;varying float vA;void main(){gl_FragColor=vec4(vC*vA,1.);}`});
 const pointMat=addMat({
 vertexShader:`${COMMON}
@@ -92,8 +121,7 @@ attribute float tv;attribute float br;attribute float sz;attribute float kind;at
 varying vec3 vC;varying float vA;
 void main(){float dt=uT-tv;float lit=step(0.,dt);vec3 p=position;float a;float s=sz;float hot;
 if(kind>.5){float e=max(dt,0.);p+=vel*(1.-exp(-e*2.))*1.2;a=lit*exp(-e*1.8)*step(e,2.5)*br;s*=1.-min(e*.3,.7);hot=.7;}
-else{float fl=lit*exp(-max(dt,0.)*3.);float held=uLit*(1.-.3*uZoom);
-a=(mix(uDim*1.3*(1.+uZoom*2.),held,lit)+fl*.6*uGain)*br;s*=1.+fl*1.;hot=clamp(fl,0.,1.)*.7;}
+else{float fl=lit*exp(-max(dt,0.)*3.);a=(mix(uDim*1.3*(1.+uZoom*2.),uLit*(1.-.3*uZoom),lit)+fl*.6*uGain)*br;s*=1.+fl*1.3;hot=clamp(fl,0.,1.)*.8;}
 vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;
 vA=a*fadeD(-mv.z);gl_PointSize=clamp(s*uPx*260./max(-mv.z,1.),1.,72.);
 vC=mix(ombre(position),vec3(1.,.96,.88),hot);}`,
@@ -103,37 +131,39 @@ vertexShader:`${COMMON}
 uniform float uS;attribute float ss;attribute float ed;varying vec3 vC;varying float vA;
 void main(){vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;
 float d=uS-ss;float near=exp(-abs(d)/18.);float past=step(0.,d);
-vA=(.005+.009*past+.022*near)*(.35+.65*ed)*fadeD(-mv.z)*mix(1.,.5,uZoom)*uGain;vC=ombre(position);}`,
+vA=(.002+.01*past+.022*near)*(.35+.65*ed)*fadeD(-mv.z)*mix(1.,.5,uZoom)*uGain;vC=ombre(position);}`,
 fragmentShader:`varying vec3 vC;varying float vA;void main(){gl_FragColor=vec4(vC*vA,1.);}`});
 
-/* ===== seeded random (same song = same map) ===== */
+/* ================= seeded random (same song → same map) ================= */
 let rng=Math.random;
 const seedRng=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
 
-/* ===== spiral track: 0:00 at the back, rings coming towards you ===== */
-const SPEED=9,R0=34,PITCH=32,K=PITCH/TAU;
+/* ================= track: spiral, 0:00 at the back, coming towards you ================= */
+const SPEED=9,R0=34,PITCH=44,K=PITCH/TAU;
 let Ltrack=1,ZSPAN=40,RMAX=80;
 const thOf=s=>(-R0+Math.sqrt(R0*R0+2*K*Math.max(s,0)))/K;
 const sOfTh=th=>R0*th+K*th*th/2;
 const zOf=s=>-ZSPAN*(1-Math.min(Math.max(s,0),Ltrack)/Ltrack);
 function wp(s,h,d){const th=thOf(s),r=R0+K*th+h,ph=PI/2-th;return[Math.cos(ph)*r,Math.sin(ph)*r,zOf(s)+d]}
 function basis(s){const th=thOf(s),ph=PI/2-th,c=Math.cos(ph),n=Math.sin(ph);return{N:[c,n],T:[n,-c],r:R0+K*th,c,n}}
+// rigid local frame: shapes placed here stay perfectly flat and unwarped
 function rig(s0,h,d){const b=basis(s0),z=zOf(s0)+d,cx=b.c*(b.r+h),cy=b.n*(b.r+h);
   return{T:b.T,N:b.N,f:(gx,gy)=>[cx+b.T[0]*gx+b.N[0]*gy,cy+b.T[1]*gx+b.N[1]*gy,z]}}
 
-/* ===== glass panes: one flat pane per sound ===== */
+/* ================= HUD glass panes: one flat pane per sound ================= */
+// h = height across the track, w = half-width, d = depth (towards viewer)
 const PANES=[
-  {id:'hat',   h:10.5,w:1.6, d:5},
-  {id:'snare', h:6.8, w:2.0, d:-3},
-  {id:'mel',   h:2.8, w:2.2, d:2},
-  {id:'kick',  h:-1.4,w:2.2, d:-.5},
-  {id:'bass',  h:-5.6,w:2.2, d:4},
-  {id:'groove',h:-9.6,w:1.7, d:-4},
-  {id:'text',  h:1.0, w:5.2, d:9},
-  {id:'label', h:13.7,w:.95, d:1}];
+  {id:'hat',   h:15.2,w:1.6, d:8},
+  {id:'snare', h:9.9, w:2.0, d:-5},
+  {id:'mel',   h:4.1, w:2.2, d:3},
+  {id:'kick',  h:-2.0,w:2.2, d:-1},
+  {id:'bass',  h:-8.1,w:2.2, d:6.5},
+  {id:'groove',h:-13.9,w:1.7,d:-6.5},
+  {id:'text',  h:1.0, w:5.2, d:13},
+  {id:'label', h:19.8,w:.95, d:1}];
 const PN=Object.fromEntries(PANES.map(p=>[p.id,p]));
 
-/* ===== stroke font ===== */
+/* ================= stroke font ================= */
 const FONT={A:'0,0 0,4 2,6 4,4 4,0|0,3 4,3',B:'0,0 0,6 3,6 4,5 4,4 3,3 0,3|3,3 4,2 4,1 3,0 0,0',C:'4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1',
 D:'0,0 0,6 3,6 4,5 4,1 3,0 0,0',E:'4,6 0,6 0,0 4,0|0,3 3,3',F:'4,6 0,6 0,0|0,3 3,3',G:'4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1 4,3 2,3',
 H:'0,0 0,6|4,0 4,6|0,3 4,3',I:'1,6 3,6|2,6 2,0|1,0 3,0',J:'1,6 4,6|3,6 3,1 2,0 1,0 0,1',K:'0,0 0,6|4,6 0,2|1.5,3.4 4,0',
@@ -147,7 +177,7 @@ W:'0,6 1,0 2,4 3,0 4,6',X:'0,0 4,6|0,6 4,0',Y:'0,6 2,3 4,6|2,3 2,0',Z:'0,6 4,6 0
 9:'4,3 1,3 0,4 0,5 1,6 3,6 4,5 4,1 3,0 1,0 0,1',':':'2,1.4 2,2|2,4 2,4.6',' ':''};
 const FONTP={};for(const[k,v]of Object.entries(FONT))FONTP[k]=v?v.split('|').map(st=>st.trim().split(/\s+/).map(p=>p.split(',').map(Number))):[];
 
-/* ===== hieroglyphs ===== */
+/* ================= hieroglyphs (unit coords, -1..1) ================= */
 const arc=(cx,cy,rx,ry,a0,a1,n=16)=>{const o=[];for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;o.push([cx+Math.cos(a)*rx,cy+Math.sin(a)*ry])}return o};
 const mir=st=>st.map(([x,y])=>[-x,y]);
 const snakeBody=(()=>{const o=[];for(let x=-1;x<=.751;x+=.07)o.push([x,.3*Math.sin((x+1)*PI*1.4)]);return o})();
@@ -166,7 +196,7 @@ const GLY={
   sun:[arc(0,.15,.3,.3,0,TAU,16),WING,mir(WING),[[-.22,-.14],[-.3,-.45],[-.2,-.6]],mir([[-.22,-.14],[-.3,-.45],[-.2,-.6]])],
   scarab:[arc(0,-.2,.42,.55,0,TAU,18),[[0,-.75],[0,.35]],arc(0,.42,.2,.12,0,PI,8),arc(0,.82,.17,.17,0,TAU,12),...LEGS,...LEGS.map(mir)]};
 
-/* ===== buffers ===== */
+/* ================= growable buffers ================= */
 const mk=()=>({a:new Float32Array(1<<15),n:0});
 function grow(b,k){if(b.n+k>b.a.length){let m=b.a.length*2;while(m<b.n+k)m*=2;const x=new Float32Array(m);x.set(b.a.subarray(0,b.n));b.a=x}}
 const put3=(b,x,y,z)=>{grow(b,3);b.a[b.n++]=x;b.a[b.n++]=y;b.a[b.n++]=z};
@@ -176,6 +206,7 @@ const LB=()=>({p:mk(),t:mk(),b:mk()});
 const PB=()=>({p:mk(),t:mk(),b:mk(),s:mk(),k:mk(),v:mk()});
 function seg(L,q0,t0,q1,t1,br){put3(L.p,q0[0],q0[1],q0[2]);put1(L.t,t0);put1(L.b,br);put3(L.p,q1[0],q1[1],q1[2]);put1(L.t,t1);put1(L.b,br)}
 function pt(P,q,tv,br,sz,kind=0,vx=0,vy=0,vz=0){put3(P.p,q[0],q[1],q[2]);put1(P.t,tv);put1(P.b,br);put1(P.s,sz);put1(P.k,kind);put3(P.v,vx,vy,vz)}
+// polyline with per-vertex light-up times; thick = parallel strands
 function poly(L,W,T,br,thick){
   const off=thick&&Q.strands>1?[0,.11,-.11]:[0],bb=thick&&Q.strands===1?br*1.5:br;
   for(let i=1;i<W.length;i++){const a=W[i-1],b=W[i];const dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1,px=dy/l,py=-dx/l;
@@ -187,12 +218,12 @@ function pointObj(P){const g=new THREE.BufferGeometry();g.setAttribute('position
   for(const[k,n]of[['tv','t'],['br','b'],['sz','s'],['kind','k']])g.setAttribute(k,new THREE.BufferAttribute(view(P[n]),1));
   g.setAttribute('vel',new THREE.BufferAttribute(view(P.v),3));const o=new THREE.Points(g,pointMat);o.frustumCulled=false;return o}
 
-/* ===== shapes ===== */
+/* ================= shapes ================= */
 function embers(P,R,c,tv,n,vmin,vmax){n=Math.round(n*Q.ember);for(let i=0;i<n;i++){const a=rng()*TAU,v=vmin+rng()*(vmax-vmin),ca=Math.cos(a),sa=Math.sin(a);
   pt(P,c,tv,1.1,1+rng(),1,(R.T[0]*ca+R.N[0]*sa)*v,(R.T[1]*ca+R.N[1]*sa)*v,0)}}
 function glyph(L,P,name,pane,s0,tOn,br){
   const R=rig(s0,pane.h,pane.d),sc=pane.w*.92,map=(x,y)=>R.f(x*sc,y*sc);
-  const bk=1.08,bl=.36;
+  const bk=1.08,bl=.36;   // corner brackets burn in first
   for(const[sx,sy]of[[-1,-1],[1,-1],[1,1],[-1,1]])poly(L,[map(sx*bk*1.25,sy*(bk-bl)),map(sx*bk*1.25,sy*bk),map(sx*(bk*1.25-bl),sy*bk)],[tOn,tOn+.09,tOn+.18],br*.6,false);
   const st=GLY[name];const lens=st.map(k=>{let l=0;for(let i=1;i<k.length;i++)l+=Math.hypot(k[i][0]-k[i-1][0],k[i][1]-k[i-1][1]);return l});
   const tot=lens.reduce((a,b)=>a+b,0)||1,dur=.75;let t=tOn+.18;
@@ -219,7 +250,7 @@ function textRun(L,str,sLeft,pane,v,sc,br,burn){
     s+=adv}
   return s}
 
-/* ===== whole-song analysis ===== */
+/* ================= audio analysis (whole song, before playback) ================= */
 function makeFFT(N){const rev=new Uint32Array(N),bits=Math.log2(N);for(let i=0;i<N;i++){let r=0;for(let b=0;b<bits;b++)r|=((i>>b)&1)<<(bits-1-b);rev[i]=r}
   const co=new Float32Array(N/2),si=new Float32Array(N/2);for(let k=0;k<N/2;k++){co[k]=Math.cos(TAU*k/N);si[k]=Math.sin(TAU*k/N)}
   return(re,im)=>{for(let i=0;i<N;i++){const j=rev[i];if(j>i){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}
@@ -255,11 +286,14 @@ async function analyse(buf,prog){
   const l0=Math.log2(cLo),l1=Math.log2(cHi);let cp=.5;for(let i=0;i<n;i++){const v=(cent[i]-l0)/(l1-l0);cp=cp*.85+Math.min(1,Math.max(0,v))*.15;cent[i]=cp}
   const ON={kick:onsets(E.kick,fps,.16,1.4,.06),snare:onsets(E.snare,fps,.16,1.5,.06),hat:onsets(E.hat,fps,.08,1.4,.05),
             mel:onsets(E.mel,fps,.2,1.6,.06),groove:onsets(E.groove,fps,.25,1.6,.06)};
+  // beat presence: density of kick + snare hits (low = a drop / breakdown)
   const mark=new Float32Array(n);for(const o of[...ON.kick,...ON.snare])mark[Math.min(n-1,Math.round(o.t*fps))]+=1;
   const ps=new Float64Array(n+1);for(let i=0;i<n;i++)ps[i+1]=ps[i]+mark[i];const BW=Math.round(fps*1.2),dens=new Float32Array(n);
   for(let i=0;i<n;i++){const a=Math.max(0,i-BW),b=Math.min(n,i+BW+1);dens[i]=ps[b]-ps[a]}
   const dmax=Math.max(pct(dens,.9),1),beat=new Float32Array(n);let bp=0;for(let i=0;i<n;i++){bp=bp*.95+Math.min(1,dens[i]/dmax)*.05;beat[i]=bp}
+  // held bass → snake
   const held=[];let run=-1;for(let i=0;i<=n;i++){if(i<n&&E.bass[i]>.6){if(run<0)run=i}else{if(run>=0&&(i-run)/fps>=1.2)held.push({t:run/fps,v:1});run=-1}}
+  // sections from loudness changes
   const lr=Array.from(rms,v=>Math.log(v+1e-6)),SW=Math.round(fps*2),sm=new Float32Array(n);
   {let acc=0;const q=[];for(let i=0;i<n;i++){acc+=lr[i];q.push(lr[i]);if(q.length>SW)acc-=q.shift();sm[i]=acc/q.length}}
   const NW=Math.round(fps*6),nov=new Float32Array(n);
@@ -272,25 +306,20 @@ async function analyse(buf,prog){
   return{dur:buf.duration,fps,n,E:ES,raw:E,on:ON,held,cent,beat,sections,ms:Math.round(performance.now()-t0)};
 }
 
-/* ===== build the whole map up front ===== */
+/* ================= build the whole map up front ================= */
 let A=null,mainGroup=null,textGroup=null;
 const stats={lv:0,pv:0,glyphT:[],nodeT:[],am:0,bm:0};
 const at=(arr,t)=>arr[Math.min(arr.length-1,Math.max(0,Math.round(t*A.fps)))];
 function dispose(g){if(!g)return;scene.remove(g);g.traverse(o=>{if(o.geometry)o.geometry.dispose()})}
 const near=(arr,s,r)=>{let lo=0,hi=arr.length;while(lo<hi){const m=(lo+hi)>>1;if(arr[m]<s-r)lo=m+1;else hi=m}return lo<arr.length&&arr[lo]<=s+r};
-function paneMesh(rows,a,b,dz){const gp=[],gs=[],ge=[],gi=[];let base=0;
-  for(const p of rows){const n=Math.ceil((b-a)/2)+1;
-    for(let i=0;i<n;i++){const s=Math.min(a+i*2,b);for(const r of[-1,0,1]){gp.push(...wp(s,p.h+r*p.w,p.d+dz));gs.push(s);ge.push(Math.abs(r))}}
-    for(let i=0;i<n-1;i++)for(let r=0;r<2;r++){const x=base+i*3+r,y=x+3;gi.push(x,y,x+1,y,y+1,x+1)}base+=n*3}
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(gp,3));g.setAttribute('ss',new THREE.Float32BufferAttribute(gs,1));
-  g.setAttribute('ed',new THREE.Float32BufferAttribute(ge,1));g.setIndex(gi);const m=new THREE.Mesh(g,glassMat);m.frustumCulled=false;return m}
 
 function build(){
   const t0=performance.now();dispose(mainGroup);
   rng=seedRng(Math.round(A.dur*1000)^A.n);
-  Ltrack=Math.max(A.dur*SPEED,40);RMAX=R0+K*thOf(Ltrack)+16;ZSPAN=RMAX*.55;
+  Ltrack=Math.max(A.dur*SPEED,40);RMAX=R0+K*thOf(Ltrack)+16;ZSPAN=RMAX*1.3;
   U.uR0.value=R0-12;U.uR1.value=RMAX;
   const L=LB(),P=PB(),e=at;
+  // --- choose glyph slots (heavy, spaced, meaning tied to sound) ---
   const G={kick:[],snare:[],hat:[],groove:[],mel:[],bass:[]},GAP=11;
   const slot=(k,list,minV,needBeat,name)=>{let last=-1e9;for(const o of list){const s=o.t*SPEED;
     if(s<8||s>Ltrack-5||s-last<GAP||o.v<minV)continue;if(needBeat&&e(A.beat,o.t)<.3)continue;if(rng()>.75)continue;
@@ -300,7 +329,14 @@ function build(){
   slot('mel',A.on.mel,.3,false,o=>{const c=e(A.cent,o.t);return c>.62?'sun':c>.38?'ankh':'scarab'});
   const WIN={};for(const k in G)WIN[k]=G[k].map(o=>o.t*SPEED).sort((a,b)=>a-b);
   const wr=k=>PN[k].w*1.25+.6,inWin=(k,s)=>near(WIN[k],s,wr(k));
-  const glass=paneMesh(PANES.filter(p=>p.id!=='label'&&p.id!=='text'),0,Ltrack,0);
+  // --- glass panes ---
+  const gp=[],gs=[],ge=[],gi=[];let base=0;const step=2;
+  for(const p of PANES){if(p.id==='label'||p.id==='text')continue;const n=Math.ceil(Ltrack/step)+1;
+    for(let i=0;i<n;i++){const s=Math.min(i*step,Ltrack);for(const r of[-1,0,1]){gp.push(...wp(s,p.h+r*p.w,p.d));gs.push(s);ge.push(Math.abs(r))}}
+    for(let i=0;i<n-1;i++)for(let r=0;r<2;r++){const a=base+i*3+r,b=a+3;gi.push(a,b,a+1,b,b+1,a+1)}base+=n*3}
+  const gg=new THREE.BufferGeometry();gg.setAttribute('position',new THREE.Float32BufferAttribute(gp,3));gg.setAttribute('ss',new THREE.Float32BufferAttribute(gs,1));
+  gg.setAttribute('ed',new THREE.Float32BufferAttribute(ge,1));gg.setIndex(gi);const glass=new THREE.Mesh(gg,glassMat);glass.frustumCulled=false;
+  // --- continuous elements, each strictly on its own pane ---
   const ds=.5;let i=0;
   for(let s=0;s<Ltrack;s+=ds,i++){const s1=Math.min(s+ds,Ltrack),t=s/SPEED,t1=s1/SPEED;
     const ek=e(A.E.kick,t),eb=e(A.E.bass,t),eb1=e(A.E.bass,t1),eg=e(A.E.groove,t),em=e(A.E.mel,t),es=e(A.E.snare,t),eh=e(A.E.hat,t),drop=e(A.beat,t)<.3;
@@ -315,9 +351,11 @@ function build(){
     {const p=PN.hat;if(i%2===0&&!inWin('hat',s)){const hg=(.15+.85*eh)*p.w*1.7;seg(L,wp(s,p.h-p.w,p.d),t,wp(s,p.h-p.w+hg,p.d),t+.05,(.12+.6*eh)*(drop?.4:1))}}
     {const p=PN.groove;if(!inWin('groove',s))seg(L,wp(s,p.h,p.d),t,wp(s1,p.h,p.d),t1,.08+.5*eg)}
   }
+  // --- dot grids: big vs small ---
   for(const p of PANES){if(p.id==='text'||p.id==='label')continue;const arr=A.E[p.id];
     for(let s=0;s<Ltrack;s+=Q.dotStep){const t=s/SPEED,en=e(arr,t);for(const v of[-.78,.78]){const big=en>.7&&rng()<.45;
       pt(P,wp(s,p.h+v*p.w,p.d),t,.22+.78*en,big?2.4:.7+rng()*.35)}}}
+  // --- sound events ---
   const glyphT=[],nodeT=[];
   for(const o of A.on.kick){const s=o.t*SPEED;if(s>Ltrack-1||inWin('kick',s))continue;
     if(e(A.beat,o.t)<.3){pt(P,wp(s,PN.kick.h,PN.kick.d),o.t,.6,1.6);continue}node(L,P,PN.kick,s,0,o.t,o.v,1,.5,true);nodeT.push(o.t)}
@@ -328,25 +366,136 @@ function build(){
   for(const o of A.on.groove){const s=o.t*SPEED,p=PN.groove;if(s>Ltrack-1||inWin('groove',s))continue;const R=rig(s,p.h,p.d),r=.45;
     poly(L,[R.f(-r,0),R.f(0,r),R.f(r,0),R.f(0,-r),R.f(-r,0)],[o.t,o.t+.05,o.t+.1,o.t+.15,o.t+.2],.7,false)}
   for(const k in G)for(const o of G[k]){glyph(L,P,o.name,PN[k],o.t*SPEED,o.t,1.25);glyphT.push(o.t)}
-  for(const sec of A.sections){const s=Math.max(sec.t*SPEED,.5);seg(L,wp(s,-11.5,0),sec.t,wp(s,14.6,0),sec.t+.3,.32);
+  // --- section markers + timecodes ---
+  for(const sec of A.sections){const s=Math.max(sec.t*SPEED,.5);seg(L,wp(s,-16.2,0),sec.t,wp(s,20.9,0),sec.t+.3,.32);
     textRun(L,sec.label,s+.8,PN.label,0,.3,1.1,.4)}
   mainGroup=new THREE.Group();mainGroup.add(glass,lineObj(L),pointObj(P));scene.add(mainGroup);
   stats.lv=L.p.n/3;stats.pv=P.p.n/3;stats.glyphT=glyphT.sort((a,b)=>a-b);stats.nodeT=nodeT.sort((a,b)=>a-b);stats.bm=Math.round(performance.now()-t0);
 }
+// custom text: one contiguous word on the front glass pane, upright at the top of the outermost turn that fits
 function buildText(){
   dispose(textGroup);textGroup=null;if(!A||!TXT.trim())return;
   const L=LB(),p=PN.text,sc=1.55,W=TXT.length*5.6*sc;let mid=Ltrack*.5;
   for(let k=Math.floor(thOf(Ltrack)/TAU);k>=1;k--){const m=sOfTh(TAU*k);if(m-W/2>4&&m+W/2<Ltrack-4){mid=m;break}}
   const a=Math.max(0,mid-W/2-3),b=Math.min(Ltrack,mid+W/2+3);
-  for(let s=a;s fps ${fpsV} · ${fmt(t)} / ${fmt(A?A.dur:0)}`;
+  for(let s=a;s<b;s+=.5)for(const v of[-1,1])seg(L,wp(s,p.h+v*3.6*sc,p.d),s/SPEED,wp(Math.min(s+.5,b),p.h+v*3.6*sc,p.d),Math.min(s+.5,b)/SPEED,.18);
+  textRun(L,TXT,mid-W/2,p,0,sc,1.35,.6);
+  // a small glass plate behind the word
+  const gp=[],gs=[],ge=[],gi=[];const n=Math.ceil((b-a)/2)+1;
+  for(let i=0;i<n;i++){const s=Math.min(a+i*2,b);for(const r of[-1,0,1]){gp.push(...wp(s,p.h+r*3.8*sc,p.d-.2));gs.push(s);ge.push(Math.abs(r))}}
+  for(let i=0;i<n-1;i++)for(let r=0;r<2;r++){const x=i*3+r,y=x+3;gi.push(x,y,x+1,y,y+1,x+1)}
+  const gg=new THREE.BufferGeometry();gg.setAttribute('position',new THREE.Float32BufferAttribute(gp,3));gg.setAttribute('ss',new THREE.Float32BufferAttribute(gs,1));
+  gg.setAttribute('ed',new THREE.Float32BufferAttribute(ge,1));gg.setIndex(gi);const plate=new THREE.Mesh(gg,glassMat);plate.frustumCulled=false;
+  textGroup=new THREE.Group();textGroup.add(plate,lineObj(L));scene.add(textGroup);
+}
+
+/* ================= the beam ================= */
+function beamTex(){const w=64,h=256,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d'),im=g.createImageData(w,h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const u=x/(w-1)*2-1,v=y/(h-1)*2-1,core=Math.exp(-u*u*60),glow=Math.exp(-u*u*6)*.35,vy=Math.pow(1-Math.abs(v),1.4);
+    const a=Math.min(1,(core+glow)*vy+Math.exp(-(u*u*8+v*v*30))*.6),i=(y*w+x)*4;im.data[i]=255;im.data[i+1]=244;im.data[i+2]=225;im.data[i+3]=a*255}
+  g.putImageData(im,0,0);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t}
+const beamMat=new THREE.MeshBasicMaterial({map:beamTex(),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+const beam=new THREE.Mesh(new THREE.PlaneGeometry(1,1),beamMat),halo=new THREE.Mesh(new THREE.PlaneGeometry(1,1),beamMat.clone());
+halo.material.opacity=.18;beam.visible=halo.visible=false;scene.add(beam,halo);
+const bM=new THREE.Matrix4(),vT=new THREE.Vector3(),vN=new THREE.Vector3(),vZ=new THREE.Vector3(0,0,1);
+let pulse=0;
+function beamUpdate(sNow,t,dt,e){if(!A){beam.visible=halo.visible=false;return}beam.visible=halo.visible=true;
+  const b=basis(sNow);vT.set(b.T[0],b.T[1],0);vN.set(b.N[0],b.N[1],0);bM.makeBasis(vT,vN,vZ);
+  const p=wp(sNow,1.5,1);pulse=Math.max(pulse*Math.exp(-dt*6),audio.paused?0:at(A.raw.kick,t)*.9+at(A.E.bass,t)*.2);
+  for(const[m,w,h]of[[beam,1.4+pulse*1.6,40+pulse*5],[halo,7+pulse*5,46]]){m.position.set(p[0],p[1],p[2]);m.quaternion.setFromRotationMatrix(bM);m.scale.set(w,h,1)}
+  beam.material.opacity=.7-.3*e}
+
+/* ================= camera: close-up ↔ whole spiral, orbit around the track's centre ================= */
+const CAM={k:1,kT:1,yaw:0,pitch:0,drag:false,lx:0,ly:0,zm:1,userView:false};
+const V3=THREE.Vector3,_t=new V3(),_o=new V3(),_r=new V3(),_c=new V3(),_f=new V3(),_pc=new V3(),_N=new V3(),_T=new V3(),YA=new V3(0,1,0),XA=new V3(1,0,0);
+function camUpdate(dt,sNow){
+  CAM.k+=(CAM.kT-CAM.k)*(1-Math.exp(-dt*1.8));const k=Math.min(1,Math.max(0,CAM.k)),e=k*k*(3-2*k);
+  
+  const s=Math.max(sNow,0),b=basis(s);_N.set(b.N[0],b.N[1],0);_T.set(b.T[0],b.T[1],0);
+  _t.set(...wp(Math.max(s-14,0),2,0));
+  _o.set(0,0,56).addScaledVector(_N,-23).addScaledVector(_T,11).multiplyScalar(CAM.zm);
+  _o.applyAxisAngle(_N,CAM.yaw);_r.crossVectors(_o,_N).normalize();_o.applyAxisAngle(_r,CAM.pitch);_pc.copy(_t).add(_o);
+  _c.set(0,0,-ZSPAN*.5);let D=RMAX/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*1.45*CAM.zm;if(camera.aspect<1)D/=camera.aspect;
+  _f.set(0,0,D).applyAxisAngle(XA,CAM.pitch).applyAxisAngle(YA,CAM.yaw).add(_c);
+  camera.position.lerpVectors(_pc,_f,e);
+  let a1=Math.atan2(b.N[1],b.N[0]),da=PI/2-a1;da=((da+PI)%TAU+TAU)%TAU-PI;const ua=a1+da*e;camera.up.set(Math.cos(ua),Math.sin(ua),0);
+  camera.lookAt(_t.lerp(_c,e));U.uZoom.value=e;return e}
+const cv=renderer.domElement;
+cv.addEventListener('pointerdown',ev=>{CAM.drag=true;CAM.lx=ev.clientX;CAM.ly=ev.clientY;cv.setPointerCapture(ev.pointerId)});
+cv.addEventListener('pointermove',ev=>{if(!CAM.drag)return;CAM.yaw-=(ev.clientX-CAM.lx)*.005;CAM.pitch=Math.max(-1.5,Math.min(1.5,CAM.pitch+(ev.clientY-CAM.ly)*.004));CAM.lx=ev.clientX;CAM.ly=ev.clientY});
+const endDrag=()=>{CAM.drag=false};cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+cv.addEventListener('wheel',ev=>{ev.preventDefault();CAM.zm=Math.max(.4,Math.min(2.5,CAM.zm*Math.exp(ev.deltaY*.001)))},{passive:false});
+cv.addEventListener('dblclick',()=>setView(CAM.kT<.5));
+
+/* ================= audio ================= */
+const audio=new Audio();let actx=null,recDest=null;
+function ensureCtx(){if(actx)return;actx=new (window.AudioContext||window.webkitAudioContext)();const src=actx.createMediaElementSource(audio);
+  recDest=actx.createMediaStreamDestination();src.connect(actx.destination);src.connect(recDest)}
+const status=m=>{$('status').textContent=m};
+const tick=()=>new Promise(r=>setTimeout(r,30));
+async function loadFile(f){
+  try{ensureCtx();try{await actx.resume()}catch(e){}
+    audio.pause();if(audio.src)URL.revokeObjectURL(audio.src);audio.src=URL.createObjectURL(f);
+    status('Reading…');const ab=await f.arrayBuffer();status('Decoding…');await tick();
+    const buf=await actx.decodeAudioData(ab);status('Mapping the song… 0%');
+    A=await analyse(buf,p=>status('Mapping the song… '+Math.round(p*100)+'%'));stats.am=A.ms;
+    status('Building the map…');await tick();build();buildText();
+    $('hint').style.display='none';CAM.userView=false;setView(true);$('bPlay').textContent='Play';
+    status(f.name.replace(/\.[^.]+$/,'')+' · mapped — press Play')}
+  catch(err){status('Could not load that file: '+(err&&err.message||err));window.__errs.push('Load: '+(err&&err.message||err))}}
+$('file').addEventListener('change',ev=>{const f=ev.target.files[0];if(f)loadFile(f);ev.target.value=''});
+async function togglePlay(){if(!A){$('file').click();return}ensureCtx();try{await actx.resume()}catch(e){}
+  if(audio.paused){if(!CAM.userView)setView(false);try{await audio.play()}catch(e){status('Playback blocked: '+e.message)}}else audio.pause()}
+audio.addEventListener('play',()=>$('bPlay').textContent='Pause');
+audio.addEventListener('pause',()=>$('bPlay').textContent='Play');
+audio.addEventListener('ended',()=>{$('bPlay').textContent='Play';if(rec)rec.stop()});
+const seek=dt=>{if(A)audio.currentTime=Math.max(0,Math.min(A.dur,audio.currentTime+dt))};
+function setView(far,user){CAM.kT=far?1:0;if(user)CAM.userView=true;$('bView').textContent=far?'Close up':'Zoom out'}
+
+/* ================= remote ================= */
+$('bPlay').onclick=togglePlay;$('bBack').onclick=()=>seek(-10);$('bFwd').onclick=()=>seek(10);
+$('bStop').onclick=()=>{audio.pause();audio.currentTime=0};
+$('bView').onclick=()=>setView(CAM.kT<.5,true);
+$('bReset').onclick=()=>{CAM.yaw=CAM.pitch=0;CAM.zm=1};
+let scrubbing=false;const sc=$('scrub');
+sc.addEventListener('pointerdown',()=>scrubbing=true);addEventListener('pointerup',()=>scrubbing=false);
+sc.addEventListener('input',()=>{if(A)audio.currentTime=sc.value/1000*A.dur});
+const ti=$('txt');ti.value=TXT;let tTimer=0;
+ti.addEventListener('input',()=>{TXT=cleanTxt(ti.value);clearTimeout(tTimer);tTimer=setTimeout(()=>{buildText();syncShare()},450)});
+['c1','c2','c3'].forEach((id,i)=>{const el=$(id);el.value=PAL[i];el.addEventListener('input',()=>{PAL[i]=el.value;U['uC'+(i+1)].value.set(el.value);syncShare()})});
+$('bLink').onclick=async()=>{syncShare();
+  if(location.protocol==='file:'){status('Links work once this is hosted (e.g. GitHub Pages)');return}
+  try{await navigator.clipboard.writeText(location.href);status('Link copied — it carries your text + colours, not your song')}catch(e){status(location.href)}};
+// drag the remote
+{const ui=$('ui'),gb=$('grab');let d=null;gb.addEventListener('pointerdown',ev=>{const r=ui.getBoundingClientRect();d={x:ev.clientX-r.left,y:ev.clientY-r.top};gb.setPointerCapture(ev.pointerId)});
+ gb.addEventListener('pointermove',ev=>{if(!d)return;ui.style.left=Math.max(0,Math.min(innerWidth-60,ev.clientX-d.x))+'px';ui.style.top=Math.max(0,Math.min(innerHeight-40,ev.clientY-d.y))+'px'});
+ gb.addEventListener('pointerup',()=>d=null)}
+// record → mp4 (webm fallback)
+let rec=null,chunks=[];
+$('bRec').onclick=()=>{if(rec){rec.stop();return}if(!A){status('Upload a track first');return}ensureCtx();
+  const vs=cv.captureStream(60),ms=new MediaStream([...vs.getVideoTracks(),...recDest.stream.getAudioTracks()]);
+  const type=['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=avc1,mp4a','video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
+  try{rec=new MediaRecorder(ms,type?{mimeType:type,videoBitsPerSecond:16e6}:{videoBitsPerSecond:16e6})}catch(e){status('Recording not supported here');return}
+  chunks=[];rec.ondataavailable=ev=>{if(ev.data.size)chunks.push(ev.data)};
+  rec.onstop=()=>{const mt=rec.mimeType||'video/webm',b=new Blob(chunks,{type:mt}),a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download=(TXT.trim()||'spiral')+'-visualizer.'+(mt.includes('mp4')?'mp4':'webm');a.click();rec=null;$('bRec').textContent='Record';$('bRec').classList.remove('rec');status('Saved '+a.download)};
+  rec.start(500);$('bRec').textContent='Stop rec';$('bRec').classList.add('rec');if(audio.paused)togglePlay()};
+
+/* ================= diagnostics (on screen, never in recordings) ================= */
+const dbg=$('dbg');let showDbg=lsGet('v10dbg','0')==='1';let frames=0,fpsV=0,fpsT=performance.now();
+$('bDiag').onclick=()=>{showDbg=!showDbg;lsSet('v10dbg',showDbg?'1':'0')};
+const upTo=(arr,t)=>{let lo=0,hi=arr.length;while(lo<hi){const m=(lo+hi)>>1;if(arr[m]<=t)lo=m+1;else hi=m}return lo};
+const kf=n=>n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?Math.round(n/1e3)+'k':String(n|0);
+setInterval(()=>{dbg.style.display=showDbg?'block':'none';if(!showDbg)return;const t=audio.currentTime||0;
+  let h=`<b>V10 · ${MOBILE?'phone':'desktop'} budget</b><br>fps ${fpsV} · ${fmt(t)} / ${fmt(A?A.dur:0)}`;
   if(A){const sec=A.sections.filter(s=>s.t<=t).pop();
-    h+=` map: ${kf(stats.lv)} line verts · ${kf(stats.pv)} dots (fixed) glyphs lit ${upTo(stats.glyphT,t)}/${stats.glyphT.length} · nodes lit ${upTo(stats.nodeT,t)}/${stats.nodeT.length}`+
-       ` beat ${at(A.beat,t).toFixed(2)}${at(A.beat,t)<.3?' (drop)':''} · section ${sec?sec.label:'–'} analysis ${stats.am}ms · build ${stats.bm}ms`}
-  if(performance.memory)h+=` memory ${Math.round(performance.memory.usedJSHeapSize/1048576)} MB`;
-  if(window.__errs.length)h+=` ${window.__errs.slice(-4).join('')}`;
+    h+=`<br>map: ${kf(stats.lv)} line verts · ${kf(stats.pv)} dots (fixed)<br>glyphs lit ${upTo(stats.glyphT,t)}/${stats.glyphT.length} · nodes lit ${upTo(stats.nodeT,t)}/${stats.nodeT.length}`+
+       `<br>beat ${at(A.beat,t).toFixed(2)}${at(A.beat,t)<.3?' (drop)':''} · section ${sec?sec.label:'–'}<br>analysis ${stats.am}ms · build ${stats.bm}ms`}
+  if(performance.memory)h+=`<br>memory ${Math.round(performance.memory.usedJSHeapSize/1048576)} MB`;
+  if(window.__errs.length)h+=`<br><span style="color:#ff7a7a">${window.__errs.slice(-4).join('<br>')}</span>`;
   dbg.innerHTML=h},500);
 
-/* ===== keys, resize, loop ===== */
+/* ================= keys, resize, loop ================= */
 addEventListener('keydown',ev=>{if(ev.target===ti)return;if(ev.code==='Space'){ev.preventDefault();togglePlay()}
   else if(ev.key==='v'||ev.key==='V')setView(CAM.kT<.5,true);else if(ev.key==='d'||ev.key==='D')$('bDiag').onclick();
   else if(ev.key==='ArrowLeft')seek(-10);else if(ev.key==='ArrowRight')seek(10)});
@@ -357,7 +506,10 @@ const clock=new THREE.Clock();let uiT=0;
 function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.1);
   const t=A?audio.currentTime:0,sNow=t*SPEED;U.uT.value=A?t:-10;U.uS.value=A?sNow:-1e5;
   const e=camUpdate(dt,sNow);beamUpdate(sNow,t,dt,e);
-  U.uGain.value=1-.42*e;bloom.strength=(.5+pulse*.25)*(1-e)+.35*e;
+  U.uGain.value=1-.42*e;bloom.strength=(.55+pulse*.25)*(1-e)+.4*e;
   composer.render();frames++;const now=performance.now();if(now-fpsT>1000){fpsV=Math.round(frames*1000/(now-fpsT));frames=0;fpsT=now}
   if((uiT+=dt)>.25&&A){uiT=0;$('time').textContent=fmt(t)+' / '+fmt(A.dur);if(!scrubbing)sc.value=Math.round(t/A.dur*1000)}}
 loop();
+</script>
+</body>
+</html>
